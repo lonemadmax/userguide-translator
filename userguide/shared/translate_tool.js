@@ -24,7 +24,7 @@ function sendEdition(node, id, trans, mark_fuzzy) {
 	var encoded_translation = encodeURI(trans).replace(/&/g, '%26').replace(/\+/g, '%2B');
 
 	xml_http.open('POST', base_url + '/translate.php', true);
-	xml_http.addEventListener("load", translateSaveFinished);
+	xml_http.addEventListener("load", serverRequestListener);
 	xml_http.setRequestHeader('Content-Type',
 		'application/x-www-form-urlencoded');
 	xml_http.send('translate_lang=' + lang + '&translate_doc=' + doc_id +
@@ -32,8 +32,8 @@ function sendEdition(node, id, trans, mark_fuzzy) {
 		'&translate_source=' + encoded_source + '&is_fuzzy=' + (mark_fuzzy ? '1' : '0'));
 
 	xml_http.userguide_string_id = id;
-	xml_http.userguide_trans = trans;
-	xml_http.userguide_mark_fuzzy = mark_fuzzy;
+	xml_http.userguide_new_text = trans;
+	xml_http.userguide_fuzzy = mark_fuzzy;
 }
 
 function cancelEdition(node, id) {
@@ -48,38 +48,18 @@ function removeBlock(node, id) {
 	sendEdition(node, id, '', false);
 }
 
-function translateSaveFinished() {
+function editSaveFinished(id, trans, fuzzy, send_ok) {
 	edit_window.focus();
 
-	var resp = this.responseText;
-	var id = this.userguide_string_id;
 	var next_node;
 
-	var send_ok;
-	if (resp.substring(0, 7) == 'badxml ')
-		edit_window.alert('The server rejected the translation because of XML ' +
-			"parsing errors :\n" + this.responseText.substring(3) +
-			"\n" + 'Check the XML tags used in your translation.');
-	else if (resp.substring(0, 7) == 'diffxml')
-		edit_window.alert('The server rejected the translation because the ' +
-			'XML code used in it differs from the original string.' + "\n" +
-			'Check the XML tags used in your translation.');
-	else if (resp.substring(0, 6) == 'interr')
-		edit_window.alert('The original XML code seems corrupt. Please contact ' +
-			'an administrator.' + "\n");
-	else if (resp.substring(0, 2) != 'ok')
-		edit_window.alert('There was an error sending the translation. Please ' +
-		'retry.' + "\n" + this.responseText);
-	else
-		send_ok = true;
-
-	is_fuzzy[id] = this.userguide_mark_fuzzy;
+	is_fuzzy[id] = fuzzy;
 
 	for (var i = 0 ; i < linked_nodes[id].length ; i++) {
-		linked_nodes[id][i].innerHTML = formatText(this.userguide_trans);
+		linked_nodes[id][i].innerHTML = formatText(trans);
 
 		if (send_ok) {
-			if (this.userguide_mark_fuzzy) {
+			if (fuzzy) {
 				linked_nodes[id][i].setAttribute(attr_state, 'fuzzy');
 			} else {
 				linked_nodes[id][i].removeAttribute(attr_state);

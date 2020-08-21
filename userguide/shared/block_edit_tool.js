@@ -18,12 +18,13 @@ function sendEdition(node, id, new_text, not_mark) {
 	xml_http.open('POST', base_url + '/block_edit.php', true);
 	xml_http.setRequestHeader('Content-Type',
 		'application/x-www-form-urlencoded');
-	xml_http.addEventListener("load", editSaveFinished);
+	xml_http.addEventListener("load", serverRequestListener);
 	xml_http.send('edit_doc=' + doc_id + '&edit_string=' + id +
 		'&edit_text=' + encoded_text + '&dont_mark_fuzzy=' + (not_mark ? '1' : '0'));
 
 	xml_http.userguide_string_id = id;
 	xml_http.userguide_new_text = new_text;
+	xml_http.userguide_fuzzy = !not_mark;
 }
 
 function cancelEdition(node, id) {
@@ -33,26 +34,8 @@ function cancelEdition(node, id) {
 
 var removeBlock = cancelEdition;
 
-function editSaveFinished() {
+function editSaveFinished(id, new_text, fuzzy, send_ok) {
 	edit_window.focus();
-
-	var resp = this.responseText,
-		id = this.userguide_string_id,
-		new_text = this.userguide_new_text;
-
-	var send_ok;
-	if (resp.substring(0, 7) == 'badxml ')
-		edit_window.alert('The server rejected the translation because of XML ' +
-			"parsing errors :\n" + this.responseText.substring(3) +
-			"\n" + 'Check the XML tags used in your translation.');
-	else if (resp.substring(0, 6) == 'interr')
-		edit_window.alert('The original XML code seems corrupt. Please contact ' +
-		'an administrator.' + "\n");
-	else if (resp.substring(0, 2) != 'ok')
-		edit_window.alert('There was an error sending the translation. Please ' +
-		'retry.' + "\n" + this.responseText);
-	else
-		send_ok = true;
 
 	for (var i = 0 ; i < linked_nodes[id].length ; i++) {
 		linked_nodes[id][i].innerHTML = formatText(new_text);

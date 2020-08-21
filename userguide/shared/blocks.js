@@ -64,3 +64,28 @@ function closeEditWindow() {
 	edit_window = null;
 	window.edited_node = null;
 }
+
+function serverRequestListener() {
+	const resp = this.responseText;
+	var send_ok = false;
+
+	if (resp.substring(0, 7) == 'badxml ')
+		edit_window.alert('The server rejected the change because of XML ' +
+			"parsing errors :\n" + resp.substring(3) +
+			"\n" + 'Check the XML tags.');
+	else if (resp.substring(0, 7) == 'diffxml')
+		edit_window.alert('The server rejected the change because the ' +
+			'XML code used in it differs from the original string.' + "\n" +
+			'Check the XML tags.');
+	else if (resp.substring(0, 6) == 'interr')
+		edit_window.alert('The original XML code seems corrupt. Please contact ' +
+			'an administrator.' + "\n");
+	else if (resp.substring(0, 2) != 'ok')
+		edit_window.alert('There was an error sending the change. Please ' +
+		'retry.' + "\n" + resp);
+	else
+		send_ok = true;
+
+	editSaveFinished(this.userguide_string_id, this.userguide_new_text,
+		this.userguide_fuzzy, send_ok);
+}
