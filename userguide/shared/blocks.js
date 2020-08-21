@@ -37,3 +37,30 @@ function blockClickHandler(node) {
 		window.translated_text = translated_strings[id];
 	}
 }
+
+function endEditionEvent(clickOK) {
+	if (window.edited_node == null)
+		return;
+
+	const node = window.edited_node;
+	const id = node.getAttribute(attr_trans_id);
+
+	if (clickOK) {
+		const new_text = edit_window.document.getElementById('modified').value;
+		if (new_text.trim() == '') {
+			removeBlock(node, id);
+		} else {
+			const fuzzy =
+				edit_window.document.getElementById('fuzzy_check').checked;
+			sendEdition(node, id, new_text, fuzzy);
+		}
+	} else {
+		cancelEdition(node, id);
+	}
+}
+
+function closeEditWindow() {
+	edit_window.close();
+	edit_window = null;
+	window.edited_node = null;
+}

@@ -15,43 +15,37 @@ var title_id = 0;
 var title_insert = false;
 var first_title = null;
 
-function endEditionEvent(clickOK) {
-	if (window.edited_node == null)
-		return;
+function sendEdition(node, id, trans, mark_fuzzy) {
+	translated_strings[id] = trans;
 
-	var id = window.edited_node.getAttribute(attr_trans_id);
-	var next_node = null;
+	var xml_http = new XMLHttpRequest();
 
-	if (clickOK) {
-		var trans = edit_window.document.getElementById('translated').value;
-		var mark_fuzzy = edit_window.document.getElementById('mark_fuzzy').checked;
+	var encoded_source = encodeURI(source_strings[id]).replace(/&/g, '%26').replace(/\+/g, '%2B');
+	var encoded_translation = encodeURI(trans).replace(/&/g, '%26').replace(/\+/g, '%2B');
 
-		translated_strings[id] = trans;
+	xml_http.open('POST', base_url + '/translate.php', true);
+	xml_http.addEventListener("load", translateSaveFinished);
+	xml_http.setRequestHeader('Content-Type',
+		'application/x-www-form-urlencoded');
+	xml_http.send('translate_lang=' + lang + '&translate_doc=' + doc_id +
+		'&translate_string=' + id + '&translate_text=' + encoded_translation +
+		'&translate_source=' + encoded_source + '&is_fuzzy=' + (mark_fuzzy ? '1' : '0'));
 
-		var xml_http = new XMLHttpRequest();
+	xml_http.userguide_string_id = id;
+	xml_http.userguide_trans = trans;
+	xml_http.userguide_mark_fuzzy = mark_fuzzy;
+}
 
-		var encoded_source = encodeURI(source_strings[id]).replace(/&/g, '%26').replace(/\+/g, '%2B');
-		var encoded_translation = encodeURI(trans).replace(/&/g, '%26').replace(/\+/g, '%2B');
+function cancelEdition(node, id) {
+	var text = translated_strings[id] == '' ? source_strings[id] : translated_strings[id];
+	node.innerHTML = formatText(text);
+	closeEditWindow();
+}
 
-		xml_http.open('POST', base_url + '/translate.php', true);
-		xml_http.addEventListener("load", translateSaveFinished);
-		xml_http.setRequestHeader('Content-Type',
-			'application/x-www-form-urlencoded');
-		xml_http.send('translate_lang=' + lang + '&translate_doc=' + doc_id +
-			'&translate_string=' + id + '&translate_text=' + encoded_translation +
-			'&translate_source=' + encoded_source + '&is_fuzzy=' + (mark_fuzzy ? '1' : '0'));
-
-		xml_http.userguide_string_id = id;
-		xml_http.userguide_trans = trans;
-		xml_http.userguide_mark_fuzzy = mark_fuzzy;
-		return;
-	} else {
-		window.edited_node.innerHTML = formatText(translated_strings[id]);
-		if (window.edited_node.innerHTML == ''
-			|| window.edited_node.innerText == '')
-			window.edited_node.innerHTML = formatText(source_strings[id]);
-		translateBlockDone(next_node);
-	}
+function removeBlock(node, id) {
+	// TODO: currently gives an error due to empty text, but could be used
+	// to remove a translation
+	sendEdition(node, id, '', false);
 }
 
 function translateSaveFinished() {
@@ -123,9 +117,7 @@ function translateBlockDone(next_node) {
 		window.translated_text = translated_strings[id];
 		window.setTimeout(edit_window.refreshAll, 0);
 	} else {
-		edit_window.close();
-		edit_window = null;
-		window.edited_node = null;
+		closeEditWindow();
 	}
 }
 
