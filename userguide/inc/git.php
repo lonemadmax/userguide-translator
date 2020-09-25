@@ -34,6 +34,15 @@ function git_commit($path, $comment) {
 	run_command("git -C $path commit -m $comment 2>&1");
 }
 
+function git_upload($file, $comment) {
+	$work_dir = dirname($file);
+
+	git_pull($work_dir);
+	git_add($file);
+	git_commit($work_dir, $comment);
+	git_push($work_dir);
+}
+
 function git_log($thepath) {
 	$path = escapeshellarg(basename($thepath));
 	$repo = escapeshellarg(dirname($thepath));

@@ -5,6 +5,7 @@ require_once('inc/lock.php');
 role_needed(ROLE_AUTHOR);
 
 require_once('inc/blocks.php');
+require_once('inc/edit.php');
 
 $xml_msg = '';
 
@@ -41,13 +42,7 @@ if (isset($_POST['edit_doc']) and isset($_POST['edit_string'])
 	$doc_name = $row['name'];
 
 	// Load all the md5
-	$blocks_md5 = array();
-	$req = db_query('SELECT string_id, source_md5 FROM ' . DB_STRINGS . "
-		WHERE doc_id = ?", array($doc_id));
-	while ($row = db_fetch($req)) {
-		$blocks_md5[$row['source_md5']] = $row['string_id'];
-	}
-	db_free($req);
+	$blocks_md5 = get_strings_hashes($doc_id);
 
 
 	$doc = new DOMDocument();
@@ -68,35 +63,17 @@ if (isset($_POST['edit_doc']) and isset($_POST['edit_string'])
 		db_query('UPDATE ' . DB_STRINGS . "
 			SET unused_since = NULL
 			WHERE string_id = ?", array($blocks_md5[$md5]));
-
-		db_query('UPDATE ' . DB_STRINGS . "
-			SET unused_since = ?
-			WHERE string_id = ?", array($time, $string_id));
 	} else {
-		$r_norm = ', doc_id';
-		$r_fuzzy = '';
-		$r_to_fuzzy = '';
-		$req = db_query('SELECT lang_code FROM ' . DB_LANGS);
-		while ($row = db_fetch($req)) {
-			$r_norm .= ', "translation_' . $row['lang_code'] . '"';
-			$r_fuzzy .= ', "is_fuzzy_' . $row['lang_code'] . '"';
-			$r_to_fuzzy .= ', 1';
-		}
-
-		$fuzzy = !$_POST['dont_mark_fuzzy'];
-		$update = 'source_md5' . $r_norm . $r_fuzzy;
-		$up_to = "'$md5'" . $r_norm . ($fuzzy ? $r_to_fuzzy : $r_fuzzy);
-		db_query('INSERT INTO ' . DB_STRINGS . " ($update)
-			SELECT $up_to FROM " . DB_STRINGS . "
-			WHERE string_id = ?", array($string_id));
+		$stmt = get_prepared_insert_string(!$_POST['dont_mark_fuzzy']);
+		db_execute($stmt, array($md5, $string_id));
 		$new_id = db_insert_id();
 		replace_block_id($doc, $doc, $string_id, $new_block, $new_id)
 			or die('unable to replace');
-
-		db_query('UPDATE ' . DB_STRINGS . "
-			SET unused_since = ?
-			WHERE string_id = ?", array($time, $string_id));
 	}
+
+	db_query('UPDATE ' . DB_STRINGS . "
+		SET unused_since = ?
+		WHERE string_id = ?", array($time, $string_id));
 
 	$doc->save(REF_DIR . '/' . $path_original);
 
@@ -126,11 +103,8 @@ if (isset($_POST['edit_doc']) and isset($_POST['edit_string'])
 		WHERE user_id = ?", array($user_id));
 
 	require_once('inc/git.php');
-	git_pull(dirname(REF_DIR . '/' . $path_original));
-	git_add(REF_DIR . '/' . $path_original);
-	git_commit(dirname(REF_DIR . '/' . $path_original),
+	git_upload(REF_DIR . '/' . $path_original,
 		'Block edit by ' . $user_name . ' in document ' . $doc_name . '.');
-	git_push(dirname(REF_DIR . '/' . $path_original));
 
 	exit('ok');
 }

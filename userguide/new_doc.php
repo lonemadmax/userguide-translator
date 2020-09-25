@@ -35,10 +35,8 @@ if ($src_path and $trans_path and $doc_title) {
 			$doc_id = db_insert_id();
 
 			require_once('inc/git.php');
-			git_pull(REF_DIR . '/');
-			git_add(REF_DIR . '/' . $src_path);
-			git_commit(REF_DIR . '/', 'New document: "' . $doc_title . '"');
-			git_push(REF_DIR . '/');
+			git_upload(REF_DIR . '/' . $src_path,
+				'New document: "' . $doc_title . '"');
 
 			// Log
 			db_query('

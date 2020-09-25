@@ -159,14 +159,22 @@ function html_inject_viewport($doc) {
 	$node = append_sibling($viewport, $node);
 }
 
-function db_query($query, $args = array(), $die_if_error = true) {
+function db_prepare($query) {
 	global $db_h;
-	$result = $db_h->prepare($query);
+	return $db_h->prepare($query);
+}
 
-	if (!$result->execute($args) && $die_if_error)
-		die('SQL error: ' . $db_h->errorInfo()[2] . '(' . $query . ')');
+function db_execute($stmt, $args = array(), $die_if_error = true) {
+	global $db_h;
 
-	return $result;
+	if (!$stmt->execute($args) && $die_if_error)
+		die('SQL error: ' . $db_h->errorInfo()[2] . '(' . $stmt->$queryString . ')');
+
+	return $stmt;
+}
+
+function db_query($query, $args = array(), $die_if_error = true) {
+	return db_execute(db_prepare($query), $args, $die_if_error);
 }
 
 function db_fetch($result) {

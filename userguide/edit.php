@@ -4,6 +4,8 @@ require_once('inc/lock.php');
 
 role_needed(ROLE_AUTHOR);
 
+require_once('inc/edit.php');
+
 $time = time();
 $blocks_md5 = array();
 
@@ -30,8 +32,6 @@ $head = <<<EOD
 	<script type="text/JavaScript" src="shared/edit_tool.js"></script>
 
 EOD;
-
-$r_norm = $r_fuzzy = $r_to_fuzzy = '';
 
 $error = '';
 
@@ -179,30 +179,14 @@ Do not invalidate translations for this item</label>
 	if (md5($text) != $_POST['sum'])
 		die('The XML document was corrupt.');
 
-	$blocks_md5 = array();
-	$req = db_query('
-		SELECT string_id, source_md5 FROM ' . DB_STRINGS . "
-		WHERE doc_id = ?", array($doc_id));
-	while ($row = db_fetch($req)) {
-		$blocks_md5[$row['source_md5']] = $row['string_id'];
-	}
-	db_free($req);
+	$blocks_md5 = get_strings_hashes($doc_id);
 
 	$edited_doc = new DOMDocument();
 
 	if (!@$edited_doc->loadXML($text))
 		die('Error parsing the XML document !');
 
-	$req = db_query('SELECT lang_code FROM ' . DB_LANGS);
-	$r_norm = ', doc_id';
-	$r_fuzzy = '';
-	$r_to_fuzzy = '';
-	while ($row = db_fetch($req)) {
-		$r_norm .= ', "translation_' . $row['lang_code'] . '"';
-		$r_fuzzy .= ', "is_fuzzy_' . $row['lang_code'] . '"';
-		$r_to_fuzzy .= ', 1';
-	}
-	db_free($req);
+	$insert_string_stmts = get_prepared_insert_string();
 
 	// Mark all blocks as unused (used blocks will be reenabled later)
 	db_query('
@@ -240,10 +224,7 @@ Do not invalidate translations for this item</label>
 	else
 		$comment .= '[No log message]';
 	require_once('inc/git.php');
-	git_pull(dirname($file_path));
-	git_add($file_path);
-	git_commit(dirname($file_path), $comment);
-	git_push(dirname($file_path));
+	git_upload($file_path, $comment);
 
 	redirect('update_stats.php?redir_to=block_edit.php%3Fdoc_id%3D' . $doc_id);
 	exit;
@@ -470,7 +451,7 @@ EOD;
 }
 
 function update_translations($node, $tags) {
-	global $r_norm, $r_fuzzy, $r_to_fuzzy, $doc_id, $blocks_md5;
+	global $insert_string_stmts, $doc_id, $blocks_md5;
 	foreach ($node->childNodes as $child) {
 		if ($child instanceOf DOMElement && isset($tags[$child->tagName])) {
 			if (is_array($tags[$child->tagName])) {
@@ -498,13 +479,8 @@ function update_translations($node, $tags) {
 				} else {
 					// ID in the DB, but the block was modified
 					$fuzzy = !isset($_POST['noinval'][$id_attr]);
-					$update = 'source_md5' . $r_norm . $r_fuzzy;
-					$up_to = "'$md5'" . $r_norm .
-						($fuzzy ? $r_to_fuzzy : $r_fuzzy);
-
-					db_query('INSERT INTO ' . DB_STRINGS . " ($update)
-						SELECT $up_to FROM " . DB_STRINGS . "
-						WHERE string_id = ?", array($id_attr));
+					db_execute($insert_string_stmts[$fuzzy ? 'force' : 'keep'],
+						array($md5, $id_attr));
 					$id = db_insert_id();
 					$blocks_md5[$md5] = $id;
 					$child->setAttribute(ATTR_TRANS_ID, $id);
